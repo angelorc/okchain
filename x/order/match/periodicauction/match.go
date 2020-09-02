@@ -290,6 +290,7 @@ func matchOrders(ctx sdk.Context, keeper keeper.Keeper) {
 	executeMatch(ctx, keeper, products, updatedProductsBasePrice, lockMap)
 
 	// step3: save match results for querying
+	var events sdk.Events
 	if len(updatedProductsBasePrice) > 0 {
 		blockMatchResult := &types.BlockMatchResult{
 			BlockHeight: blockHeight,
@@ -297,6 +298,29 @@ func matchOrders(ctx sdk.Context, keeper keeper.Keeper) {
 			TimeStamp:   ctx.BlockHeader().Time.Unix(),
 		}
 		keeper.SetBlockMatchResult(blockMatchResult)
+
+		for _, match := range updatedProductsBasePrice {
+			events = append(events, sdk.NewEvent(
+				"match",
+				sdk.NewAttribute("price", match.Price.String()),
+				sdk.NewAttribute("quantity", match.Quantity.String()),
+			))
+
+			for _, deal := range match.Deals {
+				events = append(events, sdk.NewEvent(
+					"match_deal",
+					sdk.NewAttribute("order_id", deal.OrderID),
+					sdk.NewAttribute("side", deal.Side),
+					sdk.NewAttribute("quantity", deal.Quantity.String()),
+					sdk.NewAttribute("fee", deal.Fee),
+					sdk.NewAttribute("fee_recv", deal.FeeReceiver),
+				))
+			}
+		}
+	}
+
+	if len(events) > 0 {
+		ctx.EventManager().EmitEvents(events)
 	}
 }
 
